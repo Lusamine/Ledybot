@@ -21,11 +21,11 @@ namespace Ledybot
         {
             details.TableName = "Giveaway Details";
             details.Columns.Add("Dex Number", typeof(int));
-            details.Columns.Add("Specific Path", typeof(string));
-            details.Columns.Add("Optional Path", typeof(string));
+            details.Columns.Add("Default PK7", typeof(string));
+            details.Columns.Add("Nickname Folder", typeof(string));
             details.Columns.Add("Gender Index", typeof(int));
             details.Columns.Add("Level Index", typeof(int));
-            details.Columns.Add("Count", typeof(int));
+            details.Columns.Add("Limit", typeof(int));
             details.Columns.Add("Traded", typeof(int));
 
             if (File.Exists(Application.StartupPath + "\\giveawaydetails.xml"))
@@ -114,7 +114,7 @@ namespace Ledybot
             string input = ((string[])e.Data.GetData(DataFormats.FileDrop, false))[0];
             if (File.GetAttributes(input).HasFlag(FileAttributes.Directory))
             {
-                
+
                 foreach(string file in Directory.GetFiles(input))
                 {
                     if(Path.GetExtension(file) == ".pk7")
@@ -188,7 +188,7 @@ namespace Ledybot
                     genderIndex = 0;
                     break;
             }
-            Directory.CreateDirectory(Path.GetDirectoryName(input) + "\\" + Path.GetFileNameWithoutExtension(input) + "\\");
+            //Directory.CreateDirectory(Path.GetDirectoryName(input) + "\\" + Path.GetFileNameWithoutExtension(input) + "\\");
 
             if(!Program.f1.giveawayDetails.ContainsKey(dexNum))
             {

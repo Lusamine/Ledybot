@@ -1,4 +1,7 @@
-﻿namespace Ledybot
+﻿using System;
+using System.Linq;
+
+namespace Ledybot
 {
     partial class MainForm
     {
@@ -6,6 +9,9 @@
         /// Required designer variable.
         /// </summary>
         private System.ComponentModel.IContainer components = null;
+        private bool allowreadpoke;
+        private bool ogbot;
+        private bool allowreadtradepoke;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -38,11 +44,13 @@
             this.lv_log = new System.Windows.Forms.ListView();
             this.Time = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.Trainer = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.TID = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.NickName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.Country = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.subRegion = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.pkmnSent = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.FC = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.TSV = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.page = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.index = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.btn_Export = new System.Windows.Forms.Button();
@@ -60,6 +68,8 @@
             this.btn_Banlist = new System.Windows.Forms.Button();
             this.btn_ShowPaths = new System.Windows.Forms.Button();
             this.tp_Injection = new System.Windows.Forms.TabPage();
+            this.btn_ReadPoke = new System.Windows.Forms.Button();
+            this.btn_ReadTrade = new System.Windows.Forms.Button();
             this.btn_WCDelete = new System.Windows.Forms.Button();
             this.btn_WCInject = new System.Windows.Forms.Button();
             this.nud_SlotWCInjection = new System.Windows.Forms.NumericUpDown();
@@ -123,6 +133,12 @@
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nud_DefaultCount)).BeginInit();
             this.SuspendLayout();
+
+            string[] cmdargs = Environment.GetCommandLineArgs();
+            allowreadpoke = cmdargs.Any(x => x.Trim('-').ToLower() == "allowreadpoke");
+            allowreadtradepoke = cmdargs.Any(x => x.Trim('-').ToLower() == "ihavethepower");
+            ogbot = cmdargs.Any(x => x.Trim('-').ToLower() == "ogbot");
+
             // 
             // tb_IP
             // 
@@ -181,12 +197,14 @@
             this.lv_log.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.Time,
             this.Trainer,
-            this.NickName,
+            this.TID,
+            this.TSV,
+            //this.NickName,
             this.Country,
             this.subRegion,
             this.pkmnSent,
             this.FC,
-            this.page,
+            //this.page,
             this.index});
             this.lv_log.ForeColor = System.Drawing.SystemColors.WindowText;
             this.lv_log.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.Nonclickable;
@@ -196,6 +214,12 @@
             this.lv_log.TabIndex = 18;
             this.lv_log.UseCompatibleStateImageBehavior = false;
             this.lv_log.View = System.Windows.Forms.View.Details;
+            this.lv_log.FullRowSelect = true;
+            this.lv_log.LabelEdit = true;
+            this.lv_log.Click += new System.EventHandler(this.btn_Click);
+            this.lv_log.DoubleClick += new System.EventHandler(this.btn_DoubleClick);
+            this.lv_log.MouseClick += new System.Windows.Forms.MouseEventHandler(this.btn_RightClick);
+
             // 
             // Time
             // 
@@ -206,6 +230,11 @@
             // 
             this.Trainer.Text = "Trainer";
             this.Trainer.Width = 73;
+            // 
+            // TID
+            // 
+            this.TID.Text = "OT/TID";
+            this.TID.Width = 100;
             // 
             // NickName
             // 
@@ -229,6 +258,11 @@
             // 
             this.FC.Text = "FC";
             this.FC.Width = 110;
+            // 
+            // TSV
+            // 
+            this.TSV.Text = "TSV";
+            this.TSV.Width = 49;
             // 
             // page
             // 
@@ -266,8 +300,10 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.tc_Control.Controls.Add(this.tp_GTS);
-            this.tc_Control.Controls.Add(this.tp_Injection);
-            this.tc_Control.Controls.Add(this.tp_Breeding);
+            if (allowreadpoke)
+                this.tc_Control.Controls.Add(this.tp_Injection);
+            if (ogbot)
+                this.tc_Control.Controls.Add(this.tp_Breeding);
             this.tc_Control.Controls.Add(this.tb_Settings);
             this.tc_Control.Location = new System.Drawing.Point(1, 33);
             this.tc_Control.Name = "tc_Control";
@@ -278,7 +314,8 @@
             // tp_GTS
             // 
             this.tp_GTS.AllowDrop = true;
-            this.tp_GTS.Controls.Add(this.groupBox3);
+            if (ogbot)
+                this.tp_GTS.Controls.Add(this.groupBox3);
             this.tp_GTS.Controls.Add(this.combo_levelrange);
             this.tp_GTS.Controls.Add(this.combo_gender);
             this.tp_GTS.Controls.Add(this.combo_pkmnList);
@@ -417,13 +454,19 @@
             // tp_Injection
             // 
             this.tp_Injection.AllowDrop = true;
-            this.tp_Injection.Controls.Add(this.btn_WCDelete);
-            this.tp_Injection.Controls.Add(this.btn_WCInject);
-            this.tp_Injection.Controls.Add(this.nud_SlotWCInjection);
-            this.tp_Injection.Controls.Add(this.label7);
-            this.tp_Injection.Controls.Add(this.btn_BrowseWCInject);
-            this.tp_Injection.Controls.Add(this.tb_WCInjection);
-            this.tp_Injection.Controls.Add(this.label12);
+            this.tp_Injection.Controls.Add(this.btn_ReadPoke);
+            if (allowreadtradepoke)
+                this.tp_Injection.Controls.Add(this.btn_ReadTrade);
+            if (ogbot)
+            {
+                this.tp_Injection.Controls.Add(this.btn_WCDelete);
+                this.tp_Injection.Controls.Add(this.btn_WCInject);
+                this.tp_Injection.Controls.Add(this.nud_SlotWCInjection);
+                this.tp_Injection.Controls.Add(this.label7);
+                this.tp_Injection.Controls.Add(this.btn_BrowseWCInject);
+                this.tp_Injection.Controls.Add(this.tb_WCInjection);
+                this.tp_Injection.Controls.Add(this.label12);
+            }
             this.tp_Injection.Controls.Add(this.btn_Delete);
             this.tp_Injection.Controls.Add(this.nud_CountInjection);
             this.tp_Injection.Controls.Add(this.label10);
@@ -445,12 +488,38 @@
             this.tp_Injection.DragDrop += new System.Windows.Forms.DragEventHandler(this.tp_Injection_DragDrop);
             this.tp_Injection.DragEnter += new System.Windows.Forms.DragEventHandler(this.tp_Injection_DragEnter);
             // 
+            // btn_ReadPoke
+            // 
+            this.btn_ReadPoke.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.btn_ReadPoke.Enabled = false;
+            this.btn_ReadPoke.Location = new System.Drawing.Point(7, 148);
+            this.btn_ReadPoke.Name = "btn_ReadPoke";
+            this.btn_ReadPoke.Size = new System.Drawing.Size(354, 23);
+            this.btn_ReadPoke.TabIndex = 21;
+            this.btn_ReadPoke.Text = "Read Pokemon from Box";
+            this.btn_ReadPoke.UseVisualStyleBackColor = true;
+            this.btn_ReadPoke.Click += new System.EventHandler(this.btn_ReadPoke_Click);
+            // 
+            // btn_ReadTrade
+            // 
+            this.btn_ReadTrade.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.btn_ReadTrade.Enabled = false;
+            this.btn_ReadTrade.Location = new System.Drawing.Point(7, 175);
+            this.btn_ReadTrade.Name = "btn_ReadTrade";
+            this.btn_ReadTrade.Size = new System.Drawing.Size(354, 23);
+            this.btn_ReadTrade.TabIndex = 21;
+            this.btn_ReadTrade.Text = "Read Pokemon from Trade";
+            this.btn_ReadTrade.UseVisualStyleBackColor = true;
+            this.btn_ReadTrade.Click += new System.EventHandler(this.btn_ReadTrade_Click);
+            // 
             // btn_WCDelete
             // 
             this.btn_WCDelete.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.btn_WCDelete.Enabled = false;
-            this.btn_WCDelete.Location = new System.Drawing.Point(6, 258);
+            this.btn_WCDelete.Location = new System.Drawing.Point(6, 290);
             this.btn_WCDelete.Name = "btn_WCDelete";
             this.btn_WCDelete.Size = new System.Drawing.Size(354, 23);
             this.btn_WCDelete.TabIndex = 21;
@@ -463,7 +532,7 @@
             this.btn_WCInject.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.btn_WCInject.Enabled = false;
-            this.btn_WCInject.Location = new System.Drawing.Point(6, 229);
+            this.btn_WCInject.Location = new System.Drawing.Point(6, 261);
             this.btn_WCInject.Name = "btn_WCInject";
             this.btn_WCInject.Size = new System.Drawing.Size(354, 23);
             this.btn_WCInject.TabIndex = 18;
@@ -473,7 +542,7 @@
             // 
             // nud_SlotWCInjection
             // 
-            this.nud_SlotWCInjection.Location = new System.Drawing.Point(8, 202);
+            this.nud_SlotWCInjection.Location = new System.Drawing.Point(8, 234);
             this.nud_SlotWCInjection.Maximum = new decimal(new int[] {
             48,
             0,
@@ -497,7 +566,7 @@
             // label7
             // 
             this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(5, 185);
+            this.label7.Location = new System.Drawing.Point(5, 217);
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(28, 13);
             this.label7.TabIndex = 15;
@@ -506,7 +575,7 @@
             // btn_BrowseWCInject
             // 
             this.btn_BrowseWCInject.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btn_BrowseWCInject.Location = new System.Drawing.Point(290, 162);
+            this.btn_BrowseWCInject.Location = new System.Drawing.Point(290, 194);
             this.btn_BrowseWCInject.Name = "btn_BrowseWCInject";
             this.btn_BrowseWCInject.Size = new System.Drawing.Size(75, 20);
             this.btn_BrowseWCInject.TabIndex = 13;
@@ -518,7 +587,7 @@
             // 
             this.tb_WCInjection.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.tb_WCInjection.Location = new System.Drawing.Point(6, 162);
+            this.tb_WCInjection.Location = new System.Drawing.Point(6, 194);
             this.tb_WCInjection.Name = "tb_WCInjection";
             this.tb_WCInjection.ReadOnly = true;
             this.tb_WCInjection.Size = new System.Drawing.Size(279, 20);
@@ -527,7 +596,7 @@
             // label12
             // 
             this.label12.AutoSize = true;
-            this.label12.Location = new System.Drawing.Point(3, 146);
+            this.label12.Location = new System.Drawing.Point(3, 176);
             this.label12.Name = "label12";
             this.label12.Size = new System.Drawing.Size(28, 13);
             this.label12.TabIndex = 11;
@@ -674,7 +743,6 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.tb_FileInjection.Location = new System.Drawing.Point(7, 24);
             this.tb_FileInjection.Name = "tb_FileInjection";
-            this.tb_FileInjection.ReadOnly = true;
             this.tb_FileInjection.Size = new System.Drawing.Size(279, 20);
             this.tb_FileInjection.TabIndex = 1;
             // 
@@ -746,15 +814,21 @@
             // 
             // tb_Settings
             // 
-            this.tb_Settings.Controls.Add(this.cb_UseLedySync);
-            this.tb_Settings.Controls.Add(this.groupBox2);
+            if (ogbot)
+            {
+                this.tb_Settings.Controls.Add(this.cb_UseLedySync);
+                this.tb_Settings.Controls.Add(this.groupBox2);
+            }
             this.tb_Settings.Controls.Add(this.tb_waittime);
             this.tb_Settings.Controls.Add(this.label6);
             this.tb_Settings.Controls.Add(this.groupBox1);
             this.tb_Settings.Controls.Add(this.nud_DefaultCount);
             this.tb_Settings.Controls.Add(this.label5);
-            this.tb_Settings.Controls.Add(this.tb_Subreddit);
-            this.tb_Settings.Controls.Add(this.label4);
+            if (ogbot)
+            {
+                this.tb_Settings.Controls.Add(this.tb_Subreddit);
+                this.tb_Settings.Controls.Add(this.label4);
+            }
             this.tb_Settings.Location = new System.Drawing.Point(4, 22);
             this.tb_Settings.Name = "tb_Settings";
             this.tb_Settings.Padding = new System.Windows.Forms.Padding(3);
@@ -762,16 +836,19 @@
             this.tb_Settings.TabIndex = 3;
             this.tb_Settings.Text = "Settings";
             this.tb_Settings.UseVisualStyleBackColor = true;
-            // 
-            // cb_UseLedySync
-            // 
-            this.cb_UseLedySync.AutoSize = true;
-            this.cb_UseLedySync.Location = new System.Drawing.Point(12, 173);
-            this.cb_UseLedySync.Name = "cb_UseLedySync";
-            this.cb_UseLedySync.Size = new System.Drawing.Size(95, 17);
-            this.cb_UseLedySync.TabIndex = 10;
-            this.cb_UseLedySync.Text = "Use LedySync";
-            this.cb_UseLedySync.UseVisualStyleBackColor = true;
+            if (ogbot)
+            {
+                // 
+                // cb_UseLedySync
+                // 
+                this.cb_UseLedySync.AutoSize = true;
+                this.cb_UseLedySync.Location = new System.Drawing.Point(12, 173);
+                this.cb_UseLedySync.Name = "cb_UseLedySync";
+                this.cb_UseLedySync.Size = new System.Drawing.Size(95, 17);
+                this.cb_UseLedySync.TabIndex = 10;
+                this.cb_UseLedySync.Text = "Use LedySync";
+                this.cb_UseLedySync.UseVisualStyleBackColor = true;
+            }
             // 
             // groupBox2
             // 
@@ -1021,7 +1098,7 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.Name = "MainForm";
-            this.Text = "Ledybot";
+            this.Text = "Ledybot+";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.MainForm_FormClosed);
             this.Load += new System.EventHandler(this.MainForm_Load);
@@ -1060,6 +1137,7 @@
         private System.Windows.Forms.ListView lv_log;
         private System.Windows.Forms.ColumnHeader Time;
         private System.Windows.Forms.ColumnHeader Trainer;
+        private System.Windows.Forms.ColumnHeader TID;
         private System.Windows.Forms.ColumnHeader NickName;
         private System.Windows.Forms.Button btn_Export;
         private System.Windows.Forms.CheckBox cb_Blacklist;
@@ -1088,6 +1166,7 @@
         private System.Windows.Forms.Timer disconnectTimer;
         private System.Windows.Forms.Timer timer2;
         private System.Windows.Forms.ColumnHeader FC;
+        private System.Windows.Forms.ColumnHeader TSV;
         private System.Windows.Forms.Button btn_ShowPaths;
         private System.Windows.Forms.Button btn_Banlist;
         private System.Windows.Forms.CheckBox cb_Reddit;
@@ -1102,6 +1181,8 @@
         private System.Windows.Forms.Button btn_Clear;
         private System.Windows.Forms.ColumnHeader Country;
         private System.Windows.Forms.ColumnHeader subRegion;
+        private System.Windows.Forms.Button btn_ReadPoke;
+        private System.Windows.Forms.Button btn_ReadTrade;
         private System.Windows.Forms.Button btn_WCDelete;
         private System.Windows.Forms.Button btn_WCInject;
         private System.Windows.Forms.NumericUpDown nud_SlotWCInjection;

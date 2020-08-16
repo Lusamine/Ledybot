@@ -32,6 +32,7 @@
             this.dgv_Details = new System.Windows.Forms.DataGridView();
             this.btn_Add = new System.Windows.Forms.Button();
             this.btn_Delete = new System.Windows.Forms.Button();
+            this.label1 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.dgv_Details)).BeginInit();
             this.SuspendLayout();
             // 
@@ -68,6 +69,14 @@
             this.btn_Delete.UseVisualStyleBackColor = true;
             this.btn_Delete.Click += new System.EventHandler(this.btn_Delete_Click);
             // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(13, 325);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(239, 23);
+            this.label1.Text = "You can drag and drop a pk7 file into this window, but it will be sent without checking for nicknames.\nClick \"Add\" if you want to send to correctly nicknamed deposits only.";
+            // 
             // GiveawayDetails
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -76,11 +85,12 @@
             this.Controls.Add(this.btn_Delete);
             this.Controls.Add(this.btn_Add);
             this.Controls.Add(this.dgv_Details);
+            this.Controls.Add(this.label1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
-            this.MaximumSize = new System.Drawing.Size(533, 385);
-            this.MinimumSize = new System.Drawing.Size(533, 385);
+            this.MaximumSize = new System.Drawing.Size(533, 400);
+            this.MinimumSize = new System.Drawing.Size(533, 400);
             this.Name = "GiveawayDetails";
             this.Text = "Giveaway Details";
             ((System.ComponentModel.ISupportInitialize)(this.dgv_Details)).EndInit();
@@ -92,5 +102,6 @@
         private System.Windows.Forms.Button btn_Add;
         private System.Windows.Forms.Button btn_Delete;
         public System.Windows.Forms.DataGridView dgv_Details;
+        private System.Windows.Forms.Label label1;
     }
 }

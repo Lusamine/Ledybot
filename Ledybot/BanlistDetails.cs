@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Text.RegularExpressions;
 
 namespace Ledybot
 {
@@ -20,6 +21,7 @@ namespace Ledybot
         {
             InitializeComponent();
             loadDetails();
+            cleanDetails();
         }
 
         private void loadDetails()
@@ -34,8 +36,42 @@ namespace Ledybot
 
             foreach (DataRow row in details.Rows)
             {
-                Program.f1.banlist.Add(row[0]);
+                string cleansed = Regex.Replace(row[0].ToString(), "[^0-9]", "");
+                Program.f1.banlist.Add(cleansed);
             }
+
+            dgv_Details.DataSource = details;
+            dgv_Details.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        }
+
+        private void cleanDetails()
+        {
+            /* We clear out everything that's not a number and then add a note
+             * to say that everything below it is a new addition since the bot
+             * turned on. */
+            List<DataRow> rowsToDelete = new List<DataRow>();
+            foreach (DataRow row in details.Rows)
+            {
+                /* Standardize the FCs to ############ format when displayed and add to banlist. */
+                string cleansed = Regex.Replace(row[0].ToString(), "[^0-9]", "");
+                bool isNumeric = Regex.IsMatch(cleansed, @"^\d+$");
+
+                /* Don't blacklist me D: */
+                if (isNumeric && !(row[0].ToString() == "079170015654" || row[0].ToString() == "130700148387"))
+                {
+                    cleansed = cleansed.ToString().PadLeft(12, '0');
+                    row[0] = cleansed;
+                    continue;
+                }
+
+                Program.f1.banlist.Remove(row[0].ToString());
+                rowsToDelete.Add(row);
+            }
+
+            foreach (DataRow row in rowsToDelete)
+                details.Rows.Remove(row);
+
+            details.Rows.Add("End of imported data.");
 
             dgv_Details.DataSource = details;
             dgv_Details.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
@@ -53,10 +89,15 @@ namespace Ledybot
             {
                 if (input.input != "")
                 {
-                    if (!Program.f1.banlist.Contains(input.input))
+                    string cleansed = Regex.Replace(input.input, "[^0-9]", "");
+                    cleansed = cleansed.ToString().PadLeft(12, '0');
+
+                    /* Don't ban me D: */
+                    if (!Program.f1.banlist.Contains(cleansed)
+                        && !(cleansed == "079170015654" || cleansed == "130700148387"))
                     {
-                        Program.f1.banlist.Add(input.input);
-                        details.Rows.Add(input.input);
+                        Program.f1.banlist.Add(cleansed);
+                        details.Rows.Add(cleansed);
                     }
                 }
             }

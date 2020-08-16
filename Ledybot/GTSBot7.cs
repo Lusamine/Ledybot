@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Net.Sockets;
-using System.Threading;
 using System.Net;
+using System.Windows.Forms;
+using System.Text.RegularExpressions;
+using Microsoft.VisualBasic;
 
 namespace Ledybot
 {
@@ -69,15 +70,16 @@ namespace Ledybot
         private int searchDirection = 0;
         private int dexnumber = 0;
         private string szFC = "";
-        private byte[] principal = new byte[4];
+        public byte[] principal = new byte[4];
+        long iFC = 0;
 
         public bool botstop = false;
         private int botState = 0;
         public int botresult = 0;
         private int attempts = 0;
         Task<bool> waitTaskbool;
-        private int commandtime = 250;
-        private int delaytime = 150;
+        private int commandtime = 200;
+        private int delaytime = 100;
         private int o3dswaittime = 1000;
 
         private int listlength = 0;
@@ -86,8 +88,14 @@ namespace Ledybot
         private int tradeIndex = -1;
         private uint addr_PageEntry = 0;
         private bool foundLastPage = false;
+        public readonly bool Sip;
+        public readonly bool nodoubledips;
+        public readonly bool saveFodder;
+        public readonly bool O3DS;
 
-        private Tuple<string, string, int, int, int, ArrayList> details;
+        public byte[] fc = new byte[8];
+
+        public Tuple<string, string, int, int, int, ArrayList> details;
 
         private async Task<bool> isCorrectWindow(int expectedScreen)
         {
@@ -144,7 +152,7 @@ namespace Ledybot
             try
             {
                 int bytesRead = clientStream.Read(message, 0, 4096);
-                if(message[0] == 0x01)
+                if (message[0] == 0x01)
                 {
                     Program.f1.ChangeStatus("LedybotTV message sent.");
                 }
@@ -172,15 +180,25 @@ namespace Ledybot
                 this.serverEndPointSync = new IPEndPoint(IPAddress.Parse(ledySyncIp), iPort);
                 syncClient.Connect(serverEndPointSync);
             }
-
-            if(useLedybotTV)
-            {
-                this.useLedybotTV = useLedybotTV;
-                int iPort = Int32.Parse(ledybotTVPort);
-                this.serverEndPointTV = new IPEndPoint(IPAddress.Parse(ledybotTVIp), iPort);
-                tvClient.Connect(serverEndPointTV);
-            }
             this.consoleName = consoleName;
+
+            string[] cmdargs = Environment.GetCommandLineArgs();
+            Sip = cmdargs.Any(x => x.Trim('-').ToLower() == "sipmode");
+            if (Sip)
+                MessageBox.Show("Broadcasting locations!");
+            nodoubledips = cmdargs.Any(x => x.Trim('-').ToLower() == "downwithdoubledips");
+            if (nodoubledips)
+                MessageBox.Show("Banning double dippers!");
+            saveFodder = cmdargs.Any(x => x.Trim('-').ToLower() == "savefodder");
+            if (saveFodder)
+                MessageBox.Show("Saving all fodder!");
+            O3DS = cmdargs.Any(x => x.Trim('-').ToLower() == "o3ds");
+            if (O3DS)
+            {
+                commandtime = 250;
+                delaytime = 150;
+                MessageBox.Show("Running O3DS settings!!");
+            }
 
             if (game == 0)
             {
@@ -409,8 +427,15 @@ namespace Ledybot
                                     Program.f1.giveawayDetails.TryGetValue(dexnumber, out details);
                                     if (details.Item1 == "")
                                     {
-                                        string szNickname = Encoding.Unicode.GetString(block, 0x14, 24).Trim('\0'); //fix to prevent nickname clipping. Count should be 24, 2 bytes per letter, 2x12=24, not 20.
-                                        string szFileToFind = details.Item2 + szNickname + ".pk7";
+                                        string szNickname = Encoding.Unicode.GetString(block, 0x14, 24).Trim('\0');
+
+                                        /* Remove all the white space and symbols when we check for file match. */
+                                        string cNickname = Regex.Replace(szNickname, "[^a-zA-Z0-9ａ-ｚＡ-Ｚ０-９]", "");
+
+                                        /* Convert everything remaining to narrow letters. */
+                                        cNickname = Microsoft.VisualBasic.Strings.StrConv(cNickname, VbStrConv.Narrow, 1041);
+
+                                        string szFileToFind = details.Item2 + cNickname + ".pk7";
                                         if (!File.Exists(szFileToFind))
                                         {
                                             addr_PageEntry = BitConverter.ToUInt32(block, iNextPrevBlockOffest);
@@ -419,17 +444,23 @@ namespace Ledybot
                                     }
                                     Array.Copy(block, 0x48, principal, 0, 4);
                                     byte checksum = Program.f1.calculateChecksum(principal);
-                                    byte[] fc = new byte[8];
                                     Array.Copy(principal, 0, fc, 0, 4);
                                     fc[4] = checksum;
-                                    long iFC = BitConverter.ToInt64(fc, 0);
+                                    iFC = BitConverter.ToInt64(fc, 0);
                                     szFC = iFC.ToString().PadLeft(12, '0');
+
+                                    /* Ban them if they're already in the list. */
+                                    if (nodoubledips && details.Item6.Contains(BitConverter.ToInt64(fc, 0)) && !Program.f1.banlist.Contains(szFC))
+                                    {
+                                        Program.f1.banlist.Add(szFC);
+                                        Program.bld.details.Rows.Add(szFC);
+                                    }
 
                                     int gender = block[0xE];
                                     int level = block[0xF];
                                     if ((gender == 0 || gender == details.Item3) && (level == 0 || level == details.Item4))
                                     {
-                                        string szTrainerName = Encoding.Unicode.GetString(block, 0x4C, 24).Trim('\0');
+                                        string szTrainerName = Encoding.Unicode.GetString(block, 0x4C, 20).Trim('\0');
                                         int countryIndex = BitConverter.ToInt16(block, 0x68);
                                         string country = "-";
                                         Program.f1.countries.TryGetValue(countryIndex, out country);
@@ -543,7 +574,14 @@ namespace Ledybot
                                     Program.f1.giveawayDetails.TryGetValue(dexnumber, out details);
                                     if (details.Item1 == "")
                                     {
-                                        string szNickname = Encoding.Unicode.GetString(block, 0x14, 24).Trim('\0'); //fix to prevent nickname clipping. Count should be 24, 2 bytes per letter, 2x12=24, not 20.
+                                        string szNickname = Encoding.Unicode.GetString(block, 0x14, 24).Trim('\0');
+
+                                        /* Remove all the white space and symbols when we check for file match. */
+                                        string cNickname = Regex.Replace(szNickname, "[^a-zA-Z0-9ａ-ｚＡ-Ｚ０-９]", "");
+
+                                        /* Convert everything remaining to narrow letters. */
+                                        cNickname = Microsoft.VisualBasic.Strings.StrConv(cNickname, VbStrConv.Narrow, 1041);
+
                                         string szFileToFind = details.Item2 + szNickname + ".pk7";
                                         if (!File.Exists(szFileToFind))
                                         {
@@ -551,6 +589,7 @@ namespace Ledybot
                                             continue;
                                         }
                                     }
+
                                     Array.Copy(block, 0x48, principal, 0, 4);
                                     byte checksum = Program.f1.calculateChecksum(principal);
                                     byte[] fc = new byte[8];
@@ -562,7 +601,7 @@ namespace Ledybot
                                     int level = block[0xF];
                                     if ((gender == 0 || gender == details.Item3) && (level == 0 || level == details.Item4))
                                     {
-                                        string szTrainerName = Encoding.Unicode.GetString(block, 0x4C, 24).Trim('\0');
+                                        string szTrainerName = Encoding.Unicode.GetString(block, 0x4C, 20).Trim('\0');
                                         int countryIndex = BitConverter.ToInt16(block, 0x68);
                                         string country = "-";
                                         Program.f1.countries.TryGetValue(countryIndex, out country);
@@ -580,7 +619,7 @@ namespace Ledybot
                                         }
                                         else if (!useLedySync)
                                         {
-                                            if ((!bReddit || Program.f1.commented.Contains(szFC)) && !details.Item6.Contains(BitConverter.ToInt32(principal, 0)) && !Program.f1.banlist.Contains(szFC))
+                                            if ((!bReddit || Program.f1.commented.Contains(szFC)) && !details.Item6.Contains(BitConverter.ToInt64(principal, 0)) && !Program.f1.banlist.Contains(szFC))
                                             {
                                                 tradeIndex = i - 1;
                                                 botState = (int)gtsbotstates.trade;
@@ -661,16 +700,20 @@ namespace Ledybot
                         //still in GTS list screen
                         //write index we want to trade
                         int page = Convert.ToInt32(Math.Floor(startIndex / 100.0)) + 1;
-                        Program.f1.ChangeStatus("Trading pokemon on page " + page + " index " + tradeIndex + "");
 
                         waitTaskbool = Program.helper.waitNTRwrite(addr_PageCurrentView, BitConverter.GetBytes(tradeIndex), iPID);
                         if (await waitTaskbool)
                         {
-                            string szNickname = Encoding.Unicode.GetString(block, 0x14, 24).Trim('\0'); //fix to prevent nickname clipping. Count should be 24, 2 bytes per letter, 2x12=24, not 20.
+                            string szNickname = Encoding.Unicode.GetString(block, 0x14, 24).Trim('\0');
 
+                            /* Remove all the white space and symbols when we check for file match. */
+                            string cNickname = Regex.Replace(szNickname, "[^a-zA-Z0-9ａ-ｚＡ-Ｚ０-９]", "");
+
+                            /* Convert everything remaining to narrow letters. */
+                            cNickname = Microsoft.VisualBasic.Strings.StrConv(cNickname, VbStrConv.Narrow, 1041);
 
                             string szPath = details.Item1;
-                            string szFileToFind = details.Item2 + szNickname + ".pk7";
+                            string szFileToFind = details.Item2 + cNickname + ".pk7";
                             if (File.Exists(szFileToFind))
                             {
                                 szPath = szFileToFind;
@@ -689,17 +732,58 @@ namespace Ledybot
                             int subRegionIndex = BitConverter.ToInt16(block, 0x6A);
                             string subregion = "-";
                             Program.f1.regions.TryGetValue(subRegionIndex, out subregion);
-                            if (bBlacklist)
-                            {
-                                details.Item6.Add(BitConverter.ToInt32(principal, 0));
-                            }
-                            Program.f1.AppendListViewItem(szTrainerName, szNickname, country, subregion, Program.PKTable.Species7[dexnumber - 1], szFC, page + "", tradeIndex + "");
+
                             if (useLedybotTV)
                             {
                                 didTradeTV(principal, consoleName, szTrainerName, country, subregion, Program.PKTable.Species7[dexnumber - 1], szFC, page + "", tradeIndex + "");
                             }
                             //Inject the Pokemon to box1slot1
                             Program.scriptHelper.write(addr_box1slot1, cloneshort, iPID);
+
+                            /* Pick up the injected mon's PID. */
+                            await Program.helper.waitPokeRead(0, 0);
+                            await Task.Delay(1000);
+                            uint PID = Program.helper.validator.PID;
+
+                            /* Pick up the injected mon's nickname if it was nicknamed. */
+                            string nickname = null;
+                            if (Program.helper.validator.IsNicknamed)
+                            {
+                                int index = Program.helper.validator.Nickname.IndexOf("\0");
+                                if (index > 0)
+                                    nickname = Program.helper.validator.Nickname.Substring(0, index);
+                                else
+                                    nickname = Program.helper.validator.Nickname.Replace("\0", "");
+                            }
+                            else
+                                nickname = Program.PKTable.Species7[dexnumber - 1];
+
+                            string GAText = "/gts sent " + szTrainerName;
+                            if (Sip)
+                            {
+                                GAText += "\r\n" + szTrainerName + " from ";
+                                if (subregion.Equals("—"))
+                                {
+                                    if (country.Equals("United States") || country.Equals("United Kingdom"))
+                                        GAText += "the ";
+                                }
+                                else
+                                    GAText += subregion + ", ";
+
+                                GAText += country;
+
+                                GAText += " has received a ";
+
+                                GAText += nickname;
+
+                                GAText += " (#";
+                                GAText += Program.f1.getLVLogSize();
+                                GAText += ")!";
+                            }
+
+                            Clipboard.SetDataObject(GAText, true, 3, 300);
+                            Program.f1.ChangeStatus("Trading to " + szTrainerName + " (page " + page + ", index " + tradeIndex + ").  Pushing to clipboard.");
+
                             //spam a to trade pokemon
                             Program.helper.quickbuton(Program.PKTable.keyA, commandtime);
                             await Task.Delay(commandtime + delaytime + 2500 + o3dswaittime);
@@ -709,29 +793,8 @@ namespace Ledybot
                             await Task.Delay(commandtime + delaytime);
                             Program.helper.quickbuton(Program.PKTable.keyA, commandtime);
                             await Task.Delay(commandtime + delaytime);
-                            if (details.Item5 > 0)
-                            {
-                                Program.f1.giveawayDetails[dexnumber] = new Tuple<string, string, int, int, int, ArrayList>(details.Item1, details.Item2, details.Item3, details.Item4, details.Item5 - 1, details.Item6);
-                                foreach (System.Data.DataRow row in Program.gd.details.Rows)
-                                {
-                                    if (row[0].ToString() == dexnumber.ToString())
-                                    {
-                                        int count = int.Parse(row[5].ToString()) - 1;
-                                        row[5] = count;
-                                        break;
-                                    }
-                                }
-                            }
+                            Program.helper.quickbuton(Program.PKTable.keyA, commandtime);
 
-                            foreach (System.Data.DataRow row in Program.gd.details.Rows)
-                            {
-                                if (row[0].ToString() == dexnumber.ToString())
-                                {
-                                    int amount = int.Parse(row[6].ToString()) + 1;
-                                    row[6] = amount;
-                                    break;
-                                }
-                            }
                             //during the trade spam a/b to get back to the start screen in case of "this pokemon has been traded"
                             await Task.Delay(10250);
                             Program.helper.quickbuton(Program.PKTable.keyA, commandtime);
@@ -743,9 +806,76 @@ namespace Ledybot
                             Program.helper.quickbuton(Program.PKTable.keyB, commandtime);
                             await Task.Delay(commandtime + delaytime);
                             await Task.Delay(1000);
+
+                            /* See if we managed to send it or not. */
+                            await Program.helper.waitPokeRead(0, 0);
+
                             Program.helper.quickbuton(Program.PKTable.keyB, commandtime);
                             await Task.Delay(commandtime + delaytime);
-                            await Task.Delay(32000);
+                            if (O3DS)
+                                await Task.Delay(32000);
+                            else
+                                await Task.Delay(30000);
+
+                            /* PID of mon in box1slot1 doesn't match the one we were sending out. */
+                            if (PID != Program.helper.validator.PID && Program.helper.validator.Species != 0)
+                            {
+                                /* Calculate their TSV. */
+                                int TSV = (Program.helper.validator.SID ^ Program.helper.validator.TID) >> 4;
+
+                                /* Get the mon's OT and TID. */
+                                string OTTID = $"{Program.helper.validator.OT_Name}".Trim('\0') + "/" +  (Program.helper.validator.Gen7 ? $"{Program.helper.validator.TrainerID7:000000}" : $"{Program.helper.validator.TID:00000}");
+
+                                /* Species (Nickname) */
+                                string speciesNick = Program.PKTable.Species7[dexnumber - 1];
+                                if (nickname != null)
+                                {
+                                    speciesNick += " (" + nickname;
+                                    speciesNick += ")";
+                                }
+
+                                /* Add them to the list of sent users. */
+                                Program.f1.AppendListViewItem(szTrainerName, OTTID, TSV.ToString(), country, subregion, speciesNick, szFC, tradeIndex + "");
+ 
+                                /* Blacklist them from receiving another. */
+                                if (bBlacklist)
+                                {
+                                    /* Don't blacklist me D: */
+                                    if (iFC != 79170015654 && iFC != 130700148387)
+                                        details.Item6.Add(iFC);
+                                }
+
+                                /* Try to extract the fodder if it was successful. */
+                                if (saveFodder)
+                                    Ledybot.MainForm.SavePK(Program.helper.validator);
+
+                                /* Decrement the limit. */
+                                if (details.Item5 > 0)
+                                {
+                                    Program.f1.giveawayDetails[dexnumber] = new Tuple<string, string, int, int, int, ArrayList>(details.Item1, details.Item2, details.Item3, details.Item4, details.Item5 - 1, details.Item6);
+                                    foreach (System.Data.DataRow row in Program.gd.details.Rows)
+                                    {
+                                        if (row[0].ToString() == dexnumber.ToString())
+                                        {
+                                            int count = int.Parse(row[5].ToString()) - 1;
+                                            row[5] = count;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                /* Increment the number sent. */
+                                foreach (System.Data.DataRow row in Program.gd.details.Rows)
+                                {
+                                    if (row[0].ToString() == dexnumber.ToString())
+                                    {
+                                        int amount = int.Parse(row[6].ToString()) + 1;
+                                        row[6] = amount;
+                                        break;
+                                    }
+                                }
+                            }
+
                             bool cont = false;
                             foreach (KeyValuePair<int, Tuple<string, string, int, int, int, ArrayList>> pair in Program.f1.giveawayDetails)
                             {
@@ -903,7 +1033,7 @@ namespace Ledybot
             {
                 syncClient.Close();
             }
-            if(this.serverEndPointTV != null)
+            if (this.serverEndPointTV != null)
             {
                 tvClient.Close();
             }

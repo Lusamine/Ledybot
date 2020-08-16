@@ -87,7 +87,7 @@ namespace Ledybot
                         break;
                 }
 
-                tb_Specific.Text = Path.GetDirectoryName(dg.FileName) + "\\" + Path.GetFileNameWithoutExtension(dg.FileName) + "\\";
+                //tb_Specific.Text = Path.GetDirectoryName(dg.FileName) + "\\" + Path.GetFileNameWithoutExtension(dg.FileName) + "\\";
             }
         }
 
@@ -183,8 +183,8 @@ namespace Ledybot
                         cmb_Gender.SelectedIndex = 0;
                         break;
                 }
-                tb_Default.Text = input;
-                tb_Specific.Text = Path.GetDirectoryName(input) + "\\" + Path.GetFileNameWithoutExtension(input) + "\\";
+                //tb_Default.Text = input;
+                tb_Specific.Text = Path.GetDirectoryName(input) + "\\";
 
 
             }

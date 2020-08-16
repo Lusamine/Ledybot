@@ -1,4 +1,6 @@
-﻿namespace Ledybot
+﻿using System.Windows.Forms;
+
+namespace Ledybot
 {
     partial class GDInput
     {
@@ -19,6 +21,8 @@
             }
             base.Dispose(disposing);
         }
+
+        private readonly ToolTip GDInfo = new ToolTip();
 
         #region Windows Form Designer generated code
 
@@ -44,16 +48,21 @@
             this.label5 = new System.Windows.Forms.Label();
             this.nud_Count = new System.Windows.Forms.NumericUpDown();
             this.label6 = new System.Windows.Forms.Label();
+            this.label7 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.nud_DexNumber)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nud_Count)).BeginInit();
+
+            GDInfo.SetToolTip(btn_BrowseDefault, "Use this only to select a pk7 file that you want\nto send to anyone who is requesting, regardless\nof whether they have a nickname set.  This can\nbe left blank.");
+            GDInfo.SetToolTip(btn_BrowseSpecific, "This is only for if you are requiring users\nnickname their deposited Pokemon.  Use this to\nselect the folder that contains the nicknamed\nPokemon.  The pk7 file must be named the same\nas the nickname of the deposit 'mon.  You can\nhave multiple pk7 files of the same species in\nthe folder as long as the nicknames are different.");
+
             this.SuspendLayout();
             // 
             // tb_Default
             // 
             this.tb_Default.Location = new System.Drawing.Point(12, 138);
             this.tb_Default.Name = "tb_Default";
-            this.tb_Default.ReadOnly = true;
             this.tb_Default.Size = new System.Drawing.Size(114, 20);
+            this.tb_Default.ReadOnly = true;
             this.tb_Default.TabIndex = 5;
             // 
             // tb_Specific
@@ -61,6 +70,7 @@
             this.tb_Specific.Location = new System.Drawing.Point(12, 186);
             this.tb_Specific.Name = "tb_Specific";
             this.tb_Specific.Size = new System.Drawing.Size(114, 20);
+            this.tb_Specific.ReadOnly = true;
             this.tb_Specific.TabIndex = 7;
             // 
             // label1
@@ -79,7 +89,7 @@
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(47, 13);
             this.label2.TabIndex = 4;
-            this.label2.Text = "Default: ";
+            this.label2.Text = "Default PK7: ";
             // 
             // label3
             // 
@@ -88,7 +98,7 @@
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(45, 13);
             this.label3.TabIndex = 5;
-            this.label3.Text = "Specific";
+            this.label3.Text = "Nicknamed Folder";
             // 
             // btn_BrowseDefault
             // 
@@ -225,7 +235,16 @@
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(61, 13);
             this.label6.TabIndex = 33;
-            this.label6.Text = "Max Count:";
+            this.label6.Text = "Limit:";
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Location = new System.Drawing.Point(12, 250);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(246, 23);
+            this.label7.TabIndex = 34;
+            this.label7.Text = "You can drag and drop a nicknamed pk7 into\nthis window!  It will autopopulate required fields.\n\nHover over \"Browse\" for more information.";
             // 
             // GDInput
             // 
@@ -234,6 +253,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(270, 275);
             this.Controls.Add(this.label6);
+            this.Controls.Add(this.label7);
             this.Controls.Add(this.nud_Count);
             this.Controls.Add(this.label5);
             this.Controls.Add(this.cmb_Gender);
@@ -251,10 +271,10 @@
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
-            this.MaximumSize = new System.Drawing.Size(286, 314);
-            this.MinimumSize = new System.Drawing.Size(286, 314);
+            this.MaximumSize = new System.Drawing.Size(286, 350);
+            this.MinimumSize = new System.Drawing.Size(286, 350);
             this.Name = "GDInput";
-            this.Text = "GDInput";
+            this.Text = "New Giveaway Prize";
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.GDInput_DragDrop);
             this.DragEnter += new System.Windows.Forms.DragEventHandler(this.GDInput_DragEnter);
             ((System.ComponentModel.ISupportInitialize)(this.nud_DexNumber)).EndInit();
@@ -281,5 +301,6 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.NumericUpDown nud_Count;
         private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.Label label7;
     }
 }

@@ -6,16 +6,52 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Windows.Forms;
 
 namespace Ledybot
 {
     public class PKHeX
     {
-        public bool Gen7 => Version >= 30 && Version <= 31;
+        public bool Gen7 => Version >= 30 && Version <= 33;
         public bool Gen6 => Version >= 24 && Version <= 29;
         public bool Gen5 => Version >= 20 && Version <= 23;
         public bool Gen4 => Version >= 7 && Version <= 12 && Version != 9;
         public bool Gen3 => Version >= 1 && Version <= 5 || Version == 15;
+
+        public virtual string FileName
+        {
+            get
+            {
+                int index = Nickname.IndexOf("\0");
+                string popup;
+                if (index > 0)
+                    popup = Nickname.Substring(0, index);
+                else
+                    popup = Nickname.Replace("\0", "");
+
+                index = OT_Name.IndexOf("\0");
+                string OT;
+                if (index > 0)
+                    OT = OT_Name.Substring(0, index);
+                else
+                    OT = OT_Name.Replace("\0", "");
+
+                string form = AltForm > 0 ? $"-{AltForm:00}" : "";
+                string star = isShiny ? " ★" : "";
+
+                string[] BallName = {"", "Master", "Ultra", "Great", "Poké", "Safari", "Net", "Dive", "Nest", "Repeat", "Timer", "Luxury", "Premier", "Dusk", "Heal", "Quick", "Cherish", "Fast", "Level", "Lure", "Heavy", "Love", "Friend", "Moon", "Sport", "Dream", "Beast"};
+
+                string[] natureString = { "Hardy", "Lonely", "Brave", "Adamant", "Naughty", "Bold", "Docile", "Relaxed", "Impish", "Lax", "Timid", "Hasty", "Serious", "Jolly", "Naive", "Modest", "Mild", "Quiet", "Bashful", "Rash", "Calm", "Gentle", "Sassy", "Careful", "Quirky" };
+
+                string IVList = IV_HP + "." + IV_ATK + "." + IV_DEF + "." + IV_SPA + "." + IV_SPD + "." + IV_SPE;
+
+                string TIDFormatted = Gen7 ? $"{TrainerID7:000000}" : $"{TID:00000}";
+
+                string SpeciesName = Program.PKTable.Species7[Species - 1];
+                
+                return $"{Species:000}{form}{star} - {SpeciesName} - {natureString[Nature]} - {IVList} - {OT} - {TIDFormatted} - {BallName[Ball]} - {Checksum:X4}{EncryptionConstant:X8}.pk7";
+            }
+        }
 
         public int GenNumber
         {
@@ -528,6 +564,7 @@ namespace Ledybot
         public int Region { get { return Data[0xE1]; } set { Data[0xE1] = (byte)value; } }
         public int ConsoleRegion { get { return Data[0xE2]; } set { Data[0xE2] = (byte)value; } }
         public int Language { get { return Data[0xE3]; } set { Data[0xE3] = (byte)value; } }
+        public int TrainerID7 => (int)((uint)(TID | (SID << 16)) % 1000000);
         #endregion
         //////////////////////////
         ///End PKHeX PK6 Layout///

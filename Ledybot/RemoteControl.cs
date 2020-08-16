@@ -14,7 +14,7 @@ namespace Ledybot
         public uint lastRead = 0; // Last read from RAM
         public byte[] lastArray;
         public int pid = 0;
-        PKHeX validator = new PKHeX();
+        public PKHeX validator = new PKHeX();
 
         // Offsets for remote controls
         private uint buttonsOff = 0x10df20;
@@ -355,7 +355,30 @@ namespace Ledybot
             int readcount = 0;
             for (readcount = 0; readcount < timeout * 100; readcount++)
             {
-                await Task.Delay(10);
+                await Task.Delay(50);
+                if (CompareLastLog("finished"))
+                    break;
+            }
+            if (readcount == timeout * 100)
+                return -2; // No data received
+            else if (validator.Species != 0)
+            {
+                Program.f1.dumpedPKHeX.Data = validator.Data;
+                return validator.PID;
+            }
+            else // Empty slot
+                return -1;
+        }
+
+        public async Task<long> waitPokeTradeRead(uint offset)
+        {
+            uint dumpOff = offset;
+            DataReadyWaiting myArgs = new DataReadyWaiting(new byte[POKEBYTES], handlePokeRead, null);
+            Program.f1.addwaitingForData(Program.scriptHelper.data(dumpOff, POKEBYTES, pid), myArgs);
+            int readcount = 0;
+            for (readcount = 0; readcount < timeout * 100; readcount++)
+            {
+                await Task.Delay(50);
                 if (CompareLastLog("finished"))
                     break;
             }

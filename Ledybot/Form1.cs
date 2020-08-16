@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Text.RegularExpressions;
 
 namespace Ledybot
 {
@@ -28,6 +29,7 @@ namespace Ledybot
 
         public uint partyOff;
         private uint eggOff;
+        public uint tradeOff;
 
         private bool botWorking = false;
         private bool botStop = false;
@@ -35,6 +37,9 @@ namespace Ledybot
 
         private GTSBot7 GTSBot7;
         public EggBot eggbot;
+        public byte[] pkmEncrypted;
+        public byte[] cloneshort;
+        public byte[] dataToWrite;
 
         public ArrayList banlist = new ArrayList();
         static Dictionary<uint, DataReadyWaiting> waitingForData = new Dictionary<uint, DataReadyWaiting>();
@@ -42,6 +47,34 @@ namespace Ledybot
         public Dictionary<int, Tuple<string, string, int, int, int, ArrayList>> giveawayDetails = new Dictionary<int, Tuple<string, string, int, int, int, ArrayList>>();
         public Dictionary<int, string> countries = new Dictionary<int, string>();
         public Dictionary<int, string> regions = new Dictionary<int, string>();
+        public static string WorkingDirectory => IsClickonceDeployed ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "PKHeX") : Application.StartupPath;
+        public readonly bool cloningmode;
+
+        public Tuple<string, string, int, int, int, ArrayList> details;
+
+        private static string[] titleidstr = { "175e00", "1b5100" };
+
+        public static bool IsClickonceDeployed
+
+        {
+
+            get
+
+            {
+
+#if CLICKONCE
+
+                return System.Deployment.Application.ApplicationDeployment.IsNetworkDeployed;
+
+#else
+
+                return false;
+
+#endif
+
+            }
+
+        }
 
         public MainForm()
         {
@@ -60,6 +93,8 @@ namespace Ledybot
             getCountries();
             btn_Disconnect.Enabled = false;
             this.combo_pkmnList.Items.AddRange(Program.PKTable.Species7);
+            string[] cmdargs = Environment.GetCommandLineArgs();
+            cloningmode = cmdargs.Any(x => x.Trim('-').ToLower() == "cloning");
         }
 
         public void startAutoDisconnect()
@@ -90,7 +125,6 @@ namespace Ledybot
         public void getGame(object sender, EventArgs e)
         {
             InfoReadyEventArgs args = (InfoReadyEventArgs)e;
-
             string log = args.info;
             if (log.Contains("niji_loc"))
             {
@@ -99,27 +133,38 @@ namespace Ledybot
                 Program.helper.pid = pid;
                 Program.scriptHelper.write(0x3E14C0, BitConverter.GetBytes(0xE3A01000), pid);
                 game = 0;
-                MessageBox.Show("Connection Successful!");
+                Program.f1.ChangeStatus("Connection to S/M was successful!");
 
                 boxOff = 0x330D9838;
                 wcOff = 0x331397E4;
                 partyOff = 0x34195E10;
                 eggOff = 0x3313EDD8;
+                tradeOff = 0x32A870C8;
 
-            } else if(log.Contains("momiji"))
+            }
+            else if (log.Contains("momiji"))
             {
                 string splitlog = log.Substring(log.IndexOf(", pname:   momiji") - 8, log.Length - log.IndexOf(", pname:   momiji"));
                 pid = Convert.ToInt32("0x" + splitlog.Substring(0, 8), 16);
                 Program.helper.pid = pid;
-                Program.scriptHelper.write(0x3F3424, BitConverter.GetBytes(0xE3A01000), pid); // Ultra Sun  // NFC ON: E3A01001 NFC OFF: E3A01000
-                Program.scriptHelper.write(0x3F3428, BitConverter.GetBytes(0xE3A01000), pid); // Ultra Moon // NFC ON: E3A01001 NFC OFF: E3A01000
+                if (!titleidstr.Any(log.Contains))
+                {
+                    Program.f1.ChangeStatus("Connection to US was successful!");
+                    Program.scriptHelper.write(0x3F3428, BitConverter.GetBytes(0xE3A01000), pid); // Ultra Moon // NFC ON: E3A01001 NFC OFF: E3A01000                 }
+                }
+                else
+                {
+                    Program.f1.ChangeStatus("Connection to UM was successful!");
+                    Program.scriptHelper.write(0x3F3424, BitConverter.GetBytes(0xE3A01000), pid); // Ultra Sun  // NFC ON: E3A01001 NFC OFF: E3A01000 
+                }
+
                 game = 1;
-                MessageBox.Show("Connection Successful!");
 
                 boxOff = 0x33015AB0;
                 wcOff = 0x33075BF4;
                 partyOff = 0x33F7FA44;
                 eggOff = 0x3307B1E8;
+                tradeOff = 0x30000660;
             }
         }
 
@@ -156,6 +201,8 @@ namespace Ledybot
             btn_Delete.Enabled = true;
             btn_WCInject.Enabled = true;
             btn_WCDelete.Enabled = true;
+            btn_ReadPoke.Enabled = true;
+            btn_ReadTrade.Enabled = true;
             btn_EggAvailable.Enabled = true;
             btn_EggStart.Enabled = true;
         }
@@ -170,6 +217,7 @@ namespace Ledybot
             btn_Delete.Enabled = false;
             btn_WCInject.Enabled = false;
             btn_WCDelete.Enabled = false;
+            btn_ReadPoke.Enabled = false;
             btn_EggAvailable.Enabled = false;
             btn_EggStart.Enabled = false;
             btn_EggStop.Enabled = false;
@@ -195,8 +243,6 @@ namespace Ledybot
             }
         }
 
-        EggBot workerObject = null;
-
         private async void btn_Start_Click(object sender, EventArgs e)
         {
             if (giveawayDetails.Count() == 0)
@@ -215,11 +261,12 @@ namespace Ledybot
             if (rb_frontfpo.Checked)
             {
                 tradeDirection = 1;
-            }else if (rb_front.Checked)
+            }
+            else if (rb_front.Checked)
             {
                 tradeDirection = 2;
             }
-            GTSBot7 = new GTSBot7(pid, combo_pkmnList.SelectedIndex + 1, combo_gender.SelectedIndex, combo_levelrange.SelectedIndex ,cb_Blacklist.Checked, cb_Reddit.Checked, tradeDirection, tb_waittime.Text, tb_consoleName.Text, cb_UseLedySync.Checked, tb_LedySyncIP.Text, tb_LedySyncPort.Text, game, true, "127.0.0.1", "3001");
+            GTSBot7 = new GTSBot7(pid, combo_pkmnList.SelectedIndex + 1, combo_gender.SelectedIndex, combo_levelrange.SelectedIndex, cb_Blacklist.Checked, cb_Reddit.Checked, tradeDirection, tb_waittime.Text, tb_consoleName.Text, cb_UseLedySync.Checked, tb_LedySyncIP.Text, tb_LedySyncPort.Text, game, true, "127.0.0.1", "3001");
             Task<int> Bot = GTSBot7.RunBot();
             int result = await Bot;
             if (botStop)
@@ -243,14 +290,14 @@ namespace Ledybot
             botNumber = -1;
         }
 
-        public void AppendListViewItem(string szTrainerName, string szNickname, string szCountry, string szSubRegion, string szSent, string fc, string page, string index)
+        public void AppendListViewItem(string szTrainerName, string OTTID, string TSV, string szCountry, string szSubRegion, string szSent, string fc, string index)
         {
             if (InvokeRequired)
             {
-                this.Invoke(new Action<string, string, string, string, string, string, string, string>(AppendListViewItem), new object[] { szTrainerName, szNickname, szCountry, szSubRegion, szSent, fc, page, index });
+                this.Invoke(new Action<string, string, string, string, string, string, string, string>(AppendListViewItem), new object[] {szTrainerName, TID, TSV, szCountry, szSubRegion, szSent, fc, index});
                 return;
             }
-            string[] row = { DateTime.Now.ToString("h:mm:ss"), szTrainerName, szNickname, szCountry, szSubRegion, szSent, fc.Insert(4, "-").Insert(9, "-"), page, index };
+            string[] row = { DateTime.Now.ToString("HH:mm:ss"), szTrainerName, OTTID, TSV.PadLeft(4, '0'), szCountry, szSubRegion, szSent, fc.Insert(4, "-").Insert(9, "-"), index };
             var listViewItem = new ListViewItem(row);
 
             lv_log.Items.Add(listViewItem);
@@ -264,7 +311,7 @@ namespace Ledybot
                 this.Invoke(new Action<string>(ChangeStatus), new object[] { szNewStatus });
                 return;
             }
-            this.rt_status.Text = "Bot Status: "+szNewStatus;
+            this.rt_status.Text = "Bot Status: " + szNewStatus;
         }
 
         private void btn_Stop_Click(object sender, EventArgs e)
@@ -278,9 +325,57 @@ namespace Ledybot
         private void btn_Export_Click(object sender, EventArgs e)
         {
             ListViewToCSV(lv_log, AppDomain.CurrentDomain.BaseDirectory + "\\export.csv", true);
-            MessageBox.Show("Exported!");
+            Program.f1.ChangeStatus("Exported sent list to CSV.");
+
         }
 
+        private void btn_Click(object sender, EventArgs e)
+        {
+            if (sender != lv_log) return;
+
+            var builder = new StringBuilder();
+            ListViewItem item = lv_log.FocusedItem;
+            for (int n = 0; n < 8; n++)
+            {
+                builder.Append(item.SubItems[n].Text);
+                builder.Append("\t");
+
+            }
+
+            Clipboard.SetText(builder.ToString());
+            Program.f1.ChangeStatus("Copied row to clipboard.");
+        }
+
+        private void btn_RightClick(object sender, MouseEventArgs e)
+        {
+            if (sender != lv_log) return;
+            if (e.Button != MouseButtons.Right) return;
+
+            var builder = new StringBuilder();
+            ListViewItem item = lv_log.FocusedItem;
+            builder.Append("The TSV for ");
+            builder.Append(item.SubItems[2].Text);
+            builder.Append(" is ");
+            builder.Append(item.SubItems[3].Text);
+            builder.Append(".");
+
+            Clipboard.SetText(builder.ToString());
+            Program.f1.ChangeStatus("Copied TSV check to clipboard.");
+        }
+
+        private void btn_DoubleClick(object sender, EventArgs e)
+        {
+            if (sender != lv_log) return;
+
+            var builder = new StringBuilder();
+            ListViewItem item = lv_log.FocusedItem;
+            builder.Append(".checkfc ");
+            builder.Append(item.SubItems[7].Text);
+
+            Clipboard.SetText(builder.ToString());
+            Program.f1.ChangeStatus("Copied FC check to clipboard.");
+        }
+    
         public static void ListViewToCSV(ListView listView, string filePath, bool includeHidden)
         {
             //make header string
@@ -291,7 +386,7 @@ namespace Ledybot
             foreach (ListViewItem listItem in listView.Items)
                 WriteCSVRow(result, listView.Columns.Count, i => includeHidden || listView.Columns[i].Width > 0, i => listItem.SubItems[i].Text);
 
-            File.WriteAllText(filePath, result.ToString());
+            File.WriteAllText(filePath, result.ToString(), Encoding.UTF8);
         }
 
         private static void WriteCSVRow(StringBuilder result, int itemsCount, Func<int, bool> isColumnNeeded, Func<int, string> columnValue)
@@ -315,26 +410,50 @@ namespace Ledybot
         {
             FileStream srcFS;
             srcFS = new FileStream(AppDomain.CurrentDomain.BaseDirectory + "\\export.csv", FileMode.Open);
-            StreamReader srcSR = new StreamReader(srcFS, System.Text.Encoding.Default);
+            StreamReader srcSR = new StreamReader(srcFS, System.Text.Encoding.UTF8);
             srcSR.ReadLine();
+
+            if (giveawayDetails.Count() == 0)
+            {
+                MessageBox.Show("No details are set!  You can only import the FC blacklists if you have the mon listed.", "GTS Bot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             do
             {
                 string ins = srcSR.ReadLine();
                 if (ins != null)
                 {
                     string[] columns = ins.Replace("\"", "").Split(',');
+                    int index = -1;
 
                     ListViewItem lvi = new ListViewItem(columns[0]);
 
                     for (int i = 1; i < columns.Count(); i++)
                     {
                         lvi.SubItems.Add(columns[i]);
+                        if (i == 6)
+                            index = Array.IndexOf(Program.PKTable.Species7, columns[i]);
+                        else if (i == 7 && index != -1)
+                        {
+                            if (Program.f1.giveawayDetails.ContainsKey(index + 1))
+                            {
+                                Program.f1.giveawayDetails.TryGetValue(index + 1, out details);
+                                string newfc = Regex.Replace(columns[i], "[^0-9]", "");
+                                details.Item6.Add(Int64.Parse(newfc));
+                            }
+                        }
+                        else
+                            index = -1;
                     }
 
                     lv_log.Items.Add(lvi);
                 }
                 else break;
             } while (true);
+
+            Program.f1.ChangeStatus("Imported sent list and updated all GA prize Pokemon.");
+
             srcSR.Close();
         }
 
@@ -388,32 +507,162 @@ namespace Ledybot
             }
         }
 
-
-
-        private void btn_Inject_Click(object sender, EventArgs e)
+        public static string CleanFileName(string fileName)
         {
+            return Path.GetInvalidFileNameChars().Aggregate(fileName, (current, c) => current.Replace(c.ToString(), string.Empty));
+        }
 
-            if (tb_FileInjection.Text == "")
-            {
-                MessageBox.Show("Please select a file!", "Ledybot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        public static void SavePK(PKHeX pk)
+        {
+            if (pk.Species == 0)
                 return;
-            }
-            byte[] pkmEncrypted = System.IO.File.ReadAllBytes(tb_FileInjection.Text);
-            byte[] cloneshort = PKHeX.encryptArray(pkmEncrypted.Take(232).ToArray());
+
+            string filename = CleanFileName(pk.FileName);
+
+            string address = Path.Combine(WorkingDirectory, filename);
+            if (!File.Exists(address))
+                File.WriteAllBytes(address, pk.Data);
+        }
+
+        private async void btn_ReadPoke_Click(object sender, EventArgs e)
+        {
+            string popup;
             uint boxIndex = Decimal.ToUInt32((nud_BoxInjection.Value - 1) * 30 + nud_SlotInjection.Value - 1);
             uint count = Decimal.ToUInt32(nud_CountInjection.Value);
+
             if (boxIndex + count > 32 * 30)
             {
                 uint newCount = 32 * 30 - boxIndex;
                 count = newCount;
             }
 
-            byte[] dataToWrite = new byte[count * 232];
+            await Program.helper.waitPokeRead((int)nud_BoxInjection.Value - 1, (int)nud_SlotInjection.Value - 1);
+
+            if (Program.helper.validator.Species < 0 || Program.helper.validator.Species > Program.PKTable.Species7.Length - 1)
+            {
+                Program.f1.ChangeStatus("No pokemon was read.");
+                cloneshort = null;
+                return;
+            }
+
+            SavePK(Program.helper.validator);
+
+            pkmEncrypted = Program.helper.validator.Data.ToArray();
+            cloneshort = PKHeX.encryptArray(pkmEncrypted.Take(232).ToArray());
+            int index = Program.helper.validator.Nickname.IndexOf("\0");
+            if (index > 0)
+                popup = Program.helper.validator.Nickname.Substring(0, index);
+            else
+                popup = Program.helper.validator.Nickname.Replace("\0", "");
+            popup += " was read.";
+            Program.f1.ChangeStatus(popup);
+        }
+
+        private async void btn_ReadTrade_Click(object sender, EventArgs e)
+        {
+            string popup;
+
+            //byte[] dataToWrite = { 100 };
+            //Program.scriptHelper.write(0x300397F9, dataToWrite, pid);
+            //return;
+
+            await Program.helper.waitPokeTradeRead(Program.f1.tradeOff);
+
+            if (Program.helper.validator.Species < 0 || Program.helper.validator.Species > Program.PKTable.Species7.Length - 1)
+            {
+                Program.f1.ChangeStatus("No pokemon was read.");
+                cloneshort = null;
+                return;
+            }
+
+            SavePK(Program.helper.validator);
+
+            pkmEncrypted = Program.helper.validator.Data.ToArray();
+            cloneshort = PKHeX.encryptArray(pkmEncrypted.Take(232).ToArray());
+            int index = Program.helper.validator.Nickname.IndexOf("\0");
+            if (index > 0)
+                popup = Program.helper.validator.Nickname.Substring(0, index);
+            else
+                popup = Program.helper.validator.Nickname.Replace("\0", "");
+            popup += " was read.";
+            Program.f1.ChangeStatus(popup);
+        }
+
+        private async void btn_Inject_Click(object sender, EventArgs e)
+        {
+            uint boxIndex = Decimal.ToUInt32((nud_BoxInjection.Value - 1) * 30 + nud_SlotInjection.Value - 1);
+            uint count = Decimal.ToUInt32(nud_CountInjection.Value);
+            if (nud_BoxInjection.Value == 32 && nud_SlotInjection.Value + count > 30)
+                count = Decimal.ToUInt32(30 - nud_SlotInjection.Value);
+
+            if (boxIndex + count > 32 * 30)
+            {
+                uint newCount = 32 * 30 - boxIndex;
+                count = newCount;
+            }
+
+            if (tb_FileInjection.Text != "")
+            {
+                pkmEncrypted = System.IO.File.ReadAllBytes(tb_FileInjection.Text);
+                cloneshort = PKHeX.encryptArray(pkmEncrypted.Take(232).ToArray());
+            }
+            else if (cloneshort == null)
+            {
+                MessageBox.Show("Please select a file or read a pokemon in game", "Ledybot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (!cloningmode)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    int box = (int)nud_BoxInjection.Value - 1;
+                    int slot = (int)nud_SlotInjection.Value - 1;
+                    await Program.helper.waitPokeRead(box, slot);
+                    if (Program.helper.validator.Species != 0)
+                    {
+                        DialogResult result = MessageBox.Show("This will overwrite pokemon.  Continue?", "Safety Check", MessageBoxButtons.YesNo);
+                        if (result == DialogResult.Yes)
+                            break;
+                        else
+                        {
+                            MessageBox.Show("Injection cancelled.");
+                            return;
+                        }
+                    }
+                    if (++slot > 30)
+                    {
+                        slot = 0;
+                        box++;
+                        if (box > 31)
+                            box = 0;
+                    }
+                }
+
+            }
+
+            uint newslot = Decimal.ToUInt32(nud_SlotInjection.Value) + count;
+            uint newbox = Decimal.ToUInt32(nud_BoxInjection.Value);
+            if (newslot > 30)
+            {
+                newslot = newslot % 30;
+                newbox++;
+
+                if (newbox > 32)
+                    newbox = 1;
+            }
+
+            nud_BoxInjection.Value = newbox;
+            nud_SlotInjection.Value = newslot;
+
+            dataToWrite = new byte[count * 232];
+
             for (int i = 0; i < count; i++)
                 cloneshort.CopyTo(dataToWrite, i * 232);
+
             uint offset = boxOff + boxIndex * 232;
+
             Program.scriptHelper.write(offset, dataToWrite, pid);
-            MessageBox.Show("Injection Successful!");
         }
 
         private void btn_Disconnect_Click(object sender, EventArgs e)
@@ -422,12 +671,12 @@ namespace Ledybot
             {
 
 
-                if(GTSBot7 != null)
+                if (GTSBot7 != null)
                 {
                     GTSBot7.RequestStop();
                 }
 
-                if(eggbot != null)
+                if (eggbot != null)
                 {
                     eggbot.RequestStop();
                 }
@@ -436,13 +685,13 @@ namespace Ledybot
 
                 if (!Program.Connected)
                 {
-                    MessageBox.Show("Disconnection Successful!");
+                    Program.f1.ChangeStatus("Disconnection Successful!");
                     undoButtons();
                 }
             }
             else
             {
-                MessageBox.Show("You are already disconnected!");
+                Program.f1.ChangeStatus("You are already disconnected!");
                 undoButtons();
             }
         }
@@ -503,7 +752,7 @@ namespace Ledybot
                 count = newCount;
             }
 
-            byte[] dataToWrite = new byte[count * 232];
+            dataToWrite = new byte[count * 232];
             for (int i = 0; i < count; i++)
                 cloneshort.CopyTo(dataToWrite, i * 232);
             uint offset = boxOff + boxIndex * 232;
@@ -537,8 +786,6 @@ namespace Ledybot
             string hex = BitConverter.ToString(ba);
             return hex.Replace("-", "");
         }
-
-
 
         private void btn_EggAvailable_Click(object sender, EventArgs e)
         {
@@ -625,6 +872,7 @@ namespace Ledybot
         private void btn_Clear_Click(object sender, EventArgs e)
         {
             lv_log.Items.Clear();
+            Program.f1.ChangeStatus("Cleared sent list.  Blacklists on GA prize Pokemon remain.");
         }
 
         public static string[] getStringList(string f)
@@ -635,6 +883,11 @@ namespace Ledybot
             for (int i = 0; i < rawlist.Length; i++)
                 rawlist[i] = rawlist[i].Trim();
             return rawlist;
+        }
+
+        public int getLVLogSize()
+        {
+            return lv_log.Items.Count + 1;
         }
 
         private void btn_WCInject_Click(object sender, EventArgs e)
